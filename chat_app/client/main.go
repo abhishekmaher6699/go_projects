@@ -22,20 +22,31 @@ func main() {
 		for {
 			n, err := conn.Read(buffer)
 			if err != nil {
-				fmt.Println("DIsconnected")
+				fmt.Println("Disconnected")
 				return
 			}
 
-			fmt.Println("Messages:", string(buffer[:n]))
+			fmt.Print(string(buffer[:n]))
 		}
 	}()
 
 	scanner := bufio.NewScanner(os.Stdin)
-	
+
+	fmt.Print("Enter username: ")
+	scanner.Scan()
+
+	username := scanner.Text()
+
+	_, err = fmt.Fprintf(conn, "JOIN|%s\n", username)
+	if err != nil {
+		fmt.Println("Error sending username:", err)
+		return
+	}
+
 	for scanner.Scan() {
 		message := scanner.Text()
 
-		_, err := fmt.Fprintf(conn, "%s\n", message)
+		_, err := fmt.Fprintf(conn, "MSG|%s\n", message)
 		if err != nil {
 			fmt.Println("Error sending:", err)
 			return
@@ -45,5 +56,5 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		fmt.Println("Error reading input:", err)
 	}
-	
+
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -19,32 +20,38 @@ func handleClient(conn net.Conn, clients map[string]net.Conn, mu *sync.Mutex) {
 	fmt.Println("Client connected:", clientID)
 	fmt.Println("Connected clients:", len(clients))
 
+	var username string
+
 	scanner := bufio.NewScanner(conn)
-
-	if !scanner.Scan() {
-		mu.Lock()
-		delete(clients, clientID)
-		mu.Unlock()
-		return
-	}
-
-	username := scanner.Text()
-	fmt.Println("User joined:", username)
-
-
 
 	for scanner.Scan() {
 		message := scanner.Text()
 
-		fmt.Printf("%s: %s\n", username, message)
+		parts := strings.SplitN(message, "|", 2)
 
-		formattedMsg := fmt.Sprintf(
-			"%s: %s\n",
-			username,
-			message,
-		) 
+		if len(parts) != 2 {
+			continue
+		}
 
-		broadcast([]byte(formattedMsg), clientID, clients, mu)
+		messageType := parts[0]
+		data := parts[1]
+
+		switch messageType {
+		case "JOIN":
+			username = data
+			fmt.Println("User joined:", username)
+
+		case "MSG":
+			fmt.Printf("%s: %s\n", username, data)
+
+			formattedMsg := fmt.Sprintf(
+				"%s: %s\n",
+				username,
+				data,
+			)
+
+			broadcast([]byte(formattedMsg), clientID, clients, mu)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -56,8 +63,6 @@ func handleClient(conn net.Conn, clients map[string]net.Conn, mu *sync.Mutex) {
 	mu.Unlock()
 
 	fmt.Println("Client disconnected:", clientID)
-
-
 
 }
 
