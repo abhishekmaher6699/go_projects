@@ -7,12 +7,15 @@ import (
 	"context"
 	"time"
 	"sync"
+	"flag"
 
 	"github.com/redis/go-redis/v9"
 	_ "modernc.org/sqlite"
 )
 
-var serverID uint64 = 2
+var serverID uint64
+var serverPort int
+
 const (
 	serverBits = 10
 	sequenceBits = 12
@@ -28,7 +31,20 @@ var redisClient *redis.Client
 
 var idMu sync.Mutex
 
+var publicBaseURL string
+
 func main() {
+
+	port := flag.Int("port", 8080, "HTTP server port")
+	id := flag.Uint64("id", 1, "server ID")
+	publicURL := flag.String("public-url", "http://localhost:9000", "public base URL")
+
+	flag.Parse()
+
+	serverPort = *port
+	serverID = *id
+	publicBaseURL = *publicURL
+
 
 	var err error
 	db, err = sql.Open("sqlite", "urls.db")
@@ -59,10 +75,13 @@ func main() {
 	
 	http.HandleFunc("/shorten", shortenHandler)
 	http.HandleFunc("/", redirectHandler)
+	http.HandleFunc("/health", healthHandler)
 
-	fmt.Println("Server running on :8081")
 
-	err = http.ListenAndServe(":8081", nil)
+	addr := fmt.Sprintf(":%d", *port)
+	fmt.Printf("Server %d running on %s\n", serverID, addr)
+	err = http.ListenAndServe(addr, nil)
+
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +114,7 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not save URL", http.StatusInternalServerError)
 		return
 	}
-	fmt.Fprintln(w, "http://localhost:8080/"+code)
+	fmt.Fprintf(w, "%s/%s\n", publicBaseURL, code)
 
 }
 
@@ -148,6 +167,15 @@ func redirectHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, url, http.StatusFound)
 }
 
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "OK")
+}
 
 const base62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 func encodeBase62(num uint64) string {
@@ -169,7 +197,6 @@ func encodeBase62(num uint64) string {
 
 	return string(result)
 }
-
 
 func generateID() uint64 {
 	idMu.Lock()
