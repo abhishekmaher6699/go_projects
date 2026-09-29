@@ -49,6 +49,7 @@ func setHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "OK")
 }
 
+
 func getHandler(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Query().Get("key")
 
